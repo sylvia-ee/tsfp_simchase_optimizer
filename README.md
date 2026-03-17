@@ -1,6 +1,9 @@
 ## Background
 "Influence Island" is a mini-game within The Sims Freeplay that rewards winning players with a set of exclusive in-game items. I model this mini-game as a finite sequential stochastic control problem, with the primary goal of finding the optimal set of user actions to win the full set of exclusive in-game items without spending in-game currency. 
 
+## Current Status
+You can currently run a simple user interface for decision support by running `streamlit run gui.py`. 
+
 ## In Progress
 ### Must haves
 * Incorporate in-game currency decisions into models by defining a utility function
