@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from analysis_functions import solve_round
+from compute_functions import solve_round
 
 
 actions = {

@@ -1,4 +1,4 @@
-round,trial,conv_low,conv_high,win_low,win_high
+round,trial,convince_low,convince_high,win_lower,win_upper
 1,1,,,70,100
 1,2,60.0,70.0,70,100
 1,3,60.0,70.0,70,100
