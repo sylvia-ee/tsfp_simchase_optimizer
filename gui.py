@@ -10,7 +10,7 @@ from matplotlib.lines import Line2D
 # config
 
 BASE_PATH = "data"
-st.title("Decision Helper")
+st.title("Influencer Island Decision Helper")
 
 # select precomputed data 
 
@@ -43,7 +43,12 @@ trials = sorted(
 trial = st.selectbox("Trial", trials)
 
 vs_vals = sorted(optimal_Q["vs_left"].unique())
-vs_left = st.selectbox("Very Small Left", vs_vals)
+default_vs = 3 if 3 in vs_vals else vs_vals[0]
+vs_left = st.selectbox(
+    "Chocolate Left",
+    vs_vals,
+    index=vs_vals.index(default_vs)
+)
 
 # score inputs
 score_input = st.number_input("Score", step=1)
@@ -279,3 +284,5 @@ figs = plot_policy_heatmap_specific_state(
 
 st.subheader("Decision Map")
 st.pyplot(figs[round_num])
+
+# TODO: add data collection for gameplay logs
