@@ -1,120 +1,269 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
+import os
 import matplotlib.pyplot as plt
-
-# run streamlit with `streamlit run gui.py` in terminal to launch 
-
-from compute_functions import solve_round
-
-
-actions = {
-    "small": np.arange(1,21),
-    "large": np.arange(20,46),
-    "very_small": np.arange(2,10)
-}
-
-action_probs = {
-    "small": [1/20]*20,
-    "large": [1/26]*26,
-    "very_small": [1/8]*8
-}
-
-p_convince = 0.5
+import numpy as np
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.lines import Line2D
 
 
-round1 = [
-    {"conv":None,"win":(70,100)},
-    {"conv":(60,70),"win":(70,100)},
-    {"conv":(60,70),"win":(70,100)},
-    {"conv":(65,75),"win":(75,100)},
-    {"conv":(65,75),"win":(75,100)},
-    {"conv":(70,80),"win":(80,100)}
+# config
+
+BASE_PATH = "data"
+st.title("Decision Helper")
+
+# select precomputed data 
+
+dataset_options = [
+    d for d in os.listdir(BASE_PATH)
+    if os.path.isdir(os.path.join(BASE_PATH, d))
 ]
 
-round2 = [
-    {"conv":(60,70),"win":(70,100)},
-    {"conv":(60,70),"win":(70,100)},
-    {"conv":(65,75),"win":(75,100)},
-    {"conv":(65,75),"win":(75,100)},
-    {"conv":(70,80),"win":(80,100)},
-    {"conv":(70,85),"win":(85,100)},
-    {"conv":(75,85),"win":(85,100)},
-    {"conv":(75,85),"win":(85,100)}
-]
+dataset = st.selectbox("Dataset", dataset_options)
+dataset_path = os.path.join(BASE_PATH, dataset)
 
-round3 = [
-    {"conv":(65,75),"win":(75,100)},
-    {"conv":(65,75),"win":(75,100)},
-    {"conv":(70,80),"win":(80,100)},
-    {"conv":(70,80),"win":(80,100)},
-    {"conv":(75,85),"win":(85,100)},
-    {"conv":(75,85),"win":(85,100)},
-    {"conv":(80,90),"win":(90,100)},
-    {"conv":(80,98),"win":(98,100)},
-    {"conv":(90,95),"win":(95,100)},
-    {"conv":(90,95),"win":(95,100)}
-]
+# load tables from precomputed data # TODO: make pathing flexible
 
-round_map = {1: round1, 2: round2, 3: round3}
+optimal_Q = pd.read_csv(
+    os.path.join(dataset_path, "tables", "optimal_Q_table.csv")
+)
 
+full_Q = pd.read_csv(
+    os.path.join(dataset_path, "tables", "full_Q_table.csv")
+)
 
-st.title("Influence Island Decision Helper")
+# input
 
+rounds = sorted(optimal_Q["round"].unique())
+round_num = st.selectbox("Round", rounds)
 
-round_num = st.selectbox("Round", [1,2,3])
-trial = st.number_input("Trial", min_value=1, step=1)
-score = st.number_input("Score", min_value=0, max_value=101)
-vs_left = st.number_input("Very Small Left", min_value=0, max_value=3)
+trials = sorted(
+    optimal_Q[optimal_Q["round"] == round_num]["trial"].unique()
+)
+trial = st.selectbox("Trial", trials)
 
+vs_vals = sorted(optimal_Q["vs_left"].unique())
+vs_left = st.selectbox("Very Small Left", vs_vals)
 
-if st.button("Recommend Action"):
+# score inputs
+score_input = st.number_input("Score", step=1)
 
-    rules = round_map[round_num]
+valid_scores = optimal_Q[
+    (optimal_Q["round"] == round_num) &
+    (optimal_Q["trial"] == trial) &
+    (optimal_Q["vs_left"] == vs_left)
+]["score"].unique()
 
-    V, Q = solve_round(rules, actions, action_probs, p_convince)
+if len(valid_scores) == 0:
+    st.error("No valid states for this configuration")
+    st.stop()
 
-    action_values = {}
+if score_input not in valid_scores:
+    st.warning("Score is not reachable in this state")
+    st.stop()
 
-    for action in actions:
+score = int(score_input)
 
-        if action == "very_small" and vs_left == 0:
-            continue
+# lookup info
 
-        val = Q(trial-1, score, vs_left, action)
-        action_values[action] = val
+mask = (
+    (optimal_Q["round"] == round_num) &
+    (optimal_Q["trial"] == trial) &
+    (optimal_Q["score"] == score) &
+    (optimal_Q["vs_left"] == vs_left)
+)
 
+if not mask.any():
+    st.error("Invalid state")
+    st.stop()
 
-    df = pd.DataFrame({
-        "action": list(action_values.keys()),
-        "win_probability": list(action_values.values())
-    })
+opt_row = optimal_Q[mask].iloc[0]
 
+df = full_Q[
+    (full_Q["round"] == round_num) &
+    (full_Q["trial"] == trial) &
+    (full_Q["score"] == score) &
+    (full_Q["vs_left"] == vs_left)
+].copy()
 
-    best_action = df.loc[df["win_probability"].idxmax(), "action"]
-    best_prob = df["win_probability"].max()
+df = df.sort_values("win_probability", ascending=False)
 
+best_action = opt_row["action"]
+best_prob = opt_row["win_probability"]
 
-    st.success(f"Best action: {best_action}")
-    st.write(f"Win probability: {best_prob:.6f}")
+df["regret"] = best_prob - df["win_probability"]
 
+# output
 
-    st.subheader("Action Comparison")
+st.subheader("Recommendation")
 
+st.success(f"Best action: {best_action}")
+st.write(f"Win probability: {best_prob:.4f}")
 
-    fig, ax = plt.subplots()
+st.subheader("Action Comparison")
 
-    bars = ax.bar(df["action"], df["win_probability"])
+st.bar_chart(df.set_index("action")["win_probability"])
+st.dataframe(df)
 
-    for i, action in enumerate(df["action"]):
-        if action == best_action:
-            bars[i].set_linewidth(3)
+# dynamic plot...literally the same but with 5 lines added
+# need to make this less dumb 
 
-    ax.set_ylabel("Win Probability")
-    ax.set_title("Expected Success Probability by Action")
+def plot_policy_heatmap_specific_state(optimal_Q, highlight_state=None):
 
-    st.pyplot(fig)
+    figs = {}
 
+    rounds = sorted(optimal_Q["round"].unique())
 
-    st.subheader("Numerical Values")
-    st.dataframe(df)
+    for r in rounds:
+
+        df = optimal_Q[optimal_Q["round"] == r].copy()
+
+        actions = sorted(optimal_Q["action"].unique())
+        action_map = {a: i for i, a in enumerate(actions)}
+        df["action_id"] = df["action"].map(action_map)
+
+        df = df.sort_values(["trial", "vs_left", "score"])
+
+        scores = sorted(df["score"].unique())
+        trials = sorted(df["trial"].unique())
+        vs_vals = sorted(df["vs_left"].unique())
+
+        col_order = [(t, vs) for t in trials for vs in vs_vals]
+
+        pivot = df.pivot(
+            index="score",
+            columns=["trial", "vs_left"],
+            values="action_id"
+        ).reindex(columns=pd.MultiIndex.from_tuples(col_order))
+
+        Z = pivot.values
+
+        fig, ax = plt.subplots(
+            figsize=(max(12, Z.shape[1]*0.35),
+                     max(6, Z.shape[0]*0.12))
+        )
+
+        cmap = ListedColormap(plt.cm.tab10.colors[:len(actions)])
+        norm = BoundaryNorm(np.arange(len(actions)+1)-0.5, cmap.N)
+
+        mesh = ax.pcolormesh(
+            np.arange(Z.shape[1] + 1),
+            np.arange(Z.shape[0] + 1),
+            Z,
+            cmap=cmap,
+            norm=norm,
+            shading="flat",
+            edgecolors="black",
+            linewidth=0.4
+        )
+
+        # ax
+        ax.set_title(f"Optimal Policy (Round {r})", pad=40)
+        ax.set_ylabel("Score")
+        ax.set_xlabel("vs_left (nested within trial)")
+
+        x_centers = np.arange(Z.shape[1]) + 0.5
+        vs_labels = [vs for (_, vs) in col_order]
+        ax.set_xticks(x_centers)
+        ax.set_xticklabels(vs_labels)
+
+        y_centers = np.arange(Z.shape[0]) + 0.5
+        ax.set_yticks(y_centers[::10])
+        ax.set_yticklabels(scores[::10])
+
+        # t groups
+        n_vs = len(vs_vals)
+
+        for i, t in enumerate(trials):
+            start = i * n_vs
+            ax.axvline(start, color="black", linewidth=1.5)
+
+            center = start + n_vs / 2
+            ax.text(center, Z.shape[0] + 1.5, f"T{t}",
+                    ha="center", va="bottom", fontsize=10)
+
+        ax.axvline(Z.shape[1], color="black", linewidth=1.5)
+
+        # range
+        for i, t in enumerate(trials):
+
+            rule_row = df[df["trial"] == t].iloc[0]
+
+            win_low = rule_row["win_low"]
+            win_high = rule_row["win_high"]
+            conv_low = rule_row["conv_low"]
+            conv_high = rule_row["conv_high"]
+
+            start = i * n_vs
+            end = start + n_vs
+
+            if pd.notna(win_low):
+                ax.plot([start, end], [win_low, win_low],
+                        linestyle="--", color="black", linewidth=1.2)
+                ax.plot([start, end], [win_high, win_high],
+                        linestyle="--", color="black", linewidth=1.2)
+
+            if pd.notna(conv_low):
+                ax.plot([start, end], [conv_low, conv_low],
+                        linestyle=":", color="black", linewidth=1.2)
+                ax.plot([start, end], [conv_high, conv_high],
+                        linestyle=":", color="black", linewidth=1.2)
+
+        # highlight new block
+        if highlight_state is not None:
+            r_h, t_h, s_h, vs_h = highlight_state
+
+            if r_h == r:
+                try:
+                    col_idx = (
+                        trials.index(t_h) * len(vs_vals)
+                        + vs_vals.index(vs_h)
+                    )
+                    row_idx = scores.index(s_h)
+
+                    ax.add_patch(
+                        plt.Rectangle(
+                            (col_idx, row_idx),
+                            1, 1,
+                            fill=False,
+                            edgecolor="red",
+                            linewidth=3
+                        )
+                    )
+                except ValueError:
+                    pass
+
+        # cb
+        cbar = plt.colorbar(mesh, ax=ax, pad=0.02)
+        cbar.set_ticks(range(len(actions)))
+        cbar.set_ticklabels(actions)
+        cbar.set_label("Action")
+
+        # legend
+        legend_elements = [
+            Line2D([0], [0], color='black', linestyle='--', label='Win Range'),
+            Line2D([0], [0], color='black', linestyle=':', label='Convince Range')
+        ]
+
+        ax.legend(
+            handles=legend_elements,
+            bbox_to_anchor=(1.18, 1),
+            loc="upper left",
+            frameon=False
+        )
+
+        plt.subplots_adjust(right=0.78, top=0.85)
+
+        figs[r] = fig
+
+    return figs
+
+# display range
+
+figs = plot_policy_heatmap_specific_state(
+    optimal_Q,
+    highlight_state=(round_num, trial, score, vs_left)
+)
+
+st.subheader("Decision Map")
+st.pyplot(figs[round_num])
