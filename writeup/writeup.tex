@@ -1,0 +1,45 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+
+\title{Optimal Decision-Making for the "Influencer Island" Minigame from the Sims Freeplay}
+\author{Sylvia Ee}
+\date{March 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Background}
+
+Influence Island is a mini-game in the Sims Freeplay where players attempt to "influence" multiple sims (in-game NPCs) to become their friends. 
+Influencing a sufficient amount of sims is desireable because players will win an exclusive set of in-game items and/or interactions for in-game use.
+
+To influence a single sim, players must successively win three "influencing" stages. To win each stage, players must successively win all rounds within a stage. 
+Each round starts with a score of 0. Players select from a set of three actions that increase this score by a random amount. 
+These increases in score persist throughout a round and reset to 0 for each new round. 
+The "small" action randomly increases the score by an inclusive increment between 1 - 20. The "large" action randomly 
+increases the score by an inclusive increment between 20 - 45. The "chocolate" action increases the score by an inclusive 
+increment between 2 - 9. "Small" and "large" may be chosen an unlimited number of times within and across rounds and stages,
+but "chocolate" may only be chosen three times per stage. Specially, "chocolate" is the only action where loss is explicitly impossible. 
+
+Players may win the round in two ways: 
+
+    \begin{enumerate}
+        \item \textbf{Reach the "Win" Range.} Each round has a score range where winning is guaranteed. 
+        If players' scores are within this range, they win and progress to the next round (or next stage, if they are on the last round of the stage).
+        \item \textbf{Reach the "Convince" Range \& Successfully Convince.} Each round has a score range below the win range called the "convince" range. In this range,
+        a "convince" action appears. Players who choose the "convince" action have their current score compared to the score of the "influencee" sim (the influencee's score also falls within the convince range).
+        If the player's score is equal to or greater than the influencee's, then the player wins and progresses to the next round (or stage, if this is the last round of the current stage). 
+        Otherwise, they lose and are forced to restart the current stage from the first round. Alternatively, players can forgo the "convince" relationship and may choose any of the 
+        other remaining actions to increase their score. If these actions keep players within the "convince" range, players will continue to be given the "convince" option. Otherwise, only the other non-convince options will be available.
+    \end{enumerate}
+
+A round loss occurs when players' scores exceed the upper bound of the "win" range. In this case, 
+players are forced to restart the current stage from the first round. This continues until the player successfully 
+wins the stage and progresses to the next round. 
+
+
+\end{document}
+
