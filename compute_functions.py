@@ -42,7 +42,7 @@ def solve_game(round_map, actions, action_probs, p_convince):
                         if r_idx == n_rounds - 1:
                             V[(r_idx, t, score, vs_left)] = 1.0
                         else:
-                            V[(r_idx, t, score, vs_left)] = get_V(r_idx + 1, 0, 0, vs_left)
+                            V[(r_idx, t, score, vs_left)] = get_V(r_idx + 1, 0, 0, 3)
                         continue
 
                     best = 0
@@ -58,7 +58,18 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
                         if action == "convince":
                             if conv_range and conv_range[0] <= score <= conv_range[1]:
-                                val = p_convince * get_V(r_idx, t + 1, 0, vs_left)
+                                if t < n_trials - 1:
+                                    success_val = get_V(r_idx, t + 1, 0, vs_left)
+                                else:
+                                    if r_idx == n_rounds - 1:
+                                        success_val = 1.0
+                                    else:
+                                        success_val = get_V(r_idx + 1, 0, 0, 3)
+                                failure_val = get_V(r_idx, 0, 0, 3)
+                                val = (
+                                    p_convince * success_val
+                                    + (1 - p_convince) * failure_val
+                                )
                             else:
                                 val = 0
                             best = max(best, val)
@@ -79,7 +90,13 @@ def solve_game(round_map, actions, action_probs, p_convince):
                                 val = 0
 
                             elif win_low <= new_score <= win_high:
-                                val = get_V(r_idx, t + 1, 0, vs_next)
+                                if t < n_trials - 1:
+                                    val = get_V(r_idx, t + 1, 0, vs_next)
+                                else:
+                                    if r_idx == n_rounds - 1:
+                                        val = 1.0
+                                    else:
+                                        val = get_V(r_idx + 1, 0, 0, 3)
 
                             else:
                                 val = get_V(r_idx, t, new_score, vs_next)
@@ -100,7 +117,18 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
         if action == "convince":
             if conv_range and conv_range[0] <= score <= conv_range[1]:
-                return p_convince * V[(r_idx, t + 1, 0, vs_left)]
+                if t < len(rules) - 1:
+                    success_val = V[(r_idx, t + 1, 0, vs_left)]
+                else:
+                    if r_idx == n_rounds - 1:
+                        success_val = 1.0
+                    else:
+                        success_val = V[(r_idx + 1, 0, 0, 3)]
+                failure_val = V[(r_idx, 0, 0, 3)]
+                return (
+                    p_convince * success_val
+                    + (1 - p_convince) * failure_val
+                )
             return 0
 
         increments = actions[action]
@@ -118,7 +146,13 @@ def solve_game(round_map, actions, action_probs, p_convince):
                 val = 0
 
             elif win_low <= new_score <= win_high:
-                val = V[(r_idx, t + 1, 0, vs_next)]
+                if t < len(rules) - 1:
+                    val = V[(r_idx, t + 1, 0, vs_next)]
+                else:
+                    if r_idx == n_rounds - 1:
+                        val = 1.0
+                    else:
+                        val = V[(r_idx + 1, 0, 0, 3)]
 
             else:
                 val = V[(r_idx, t, new_score, vs_next)]

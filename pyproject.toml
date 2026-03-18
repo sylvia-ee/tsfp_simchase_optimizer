@@ -5,8 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "kaleido>=1.2.0",
     "matplotlib>=3.10.8",
     "numpy>=2.4.3",
     "pandas>=2.3.3",
+    "plotly>=6.6.0",
     "streamlit>=1.55.0",
 ]
