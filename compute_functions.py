@@ -4,6 +4,73 @@ import pandas as pd
 from preprocess_functions import load_game_config
 
 
+def compute_guaranteed_states(round_map, actions):
+
+    rounds = sorted(round_map.keys())
+    n_rounds = len(rounds)
+
+    G = {}
+
+    def get_G(r_idx, t, score, vs_left):
+        return G.get((r_idx, t, score, vs_left), 0)
+
+    for r_idx in reversed(range(n_rounds)):
+
+        rules = round_map[rounds[r_idx]]
+        n_trials = len(rules)
+
+        for t in reversed(range(n_trials + 1)):
+
+            for score in reversed(range(0, 101)):
+                for vs_left in range(4):
+
+                    if t == n_trials:
+                        G[(r_idx, t, score, vs_left)] = 1
+                        continue
+
+                    rule = rules[t]
+                    win_low, win_high = rule["win"]
+
+                    guaranteed = 0
+
+                    for action in actions.keys():
+
+                        if action == "very_small" and vs_left == 0:
+                            continue
+
+                        increments = actions[action]
+                        vs_next = vs_left - 1 if action == "very_small" else vs_left
+
+                        all_good = True
+
+                        for inc in increments:
+
+                            new_score = score + inc
+
+                            if action == "very_small":
+                                new_score = min(new_score, win_high)
+
+                            if new_score > win_high:
+                                all_good = False
+                                break
+
+                            elif win_low <= new_score <= win_high:
+                                continue
+
+                            else:
+                                if get_G(r_idx, t, new_score, vs_next) == 0:
+                                    all_good = False
+                                    break
+
+                        if all_good:
+                            guaranteed = 1
+                            break
+
+                    G[(r_idx, t, score, vs_left)] = guaranteed
+
+    return G
+
+
 def solve_game(round_map, actions, action_probs, p_convince):
 
     """ 
@@ -24,6 +91,7 @@ def solve_game(round_map, actions, action_probs, p_convince):
     n_rounds = len(rounds)
 
     V = {}
+    G = compute_guaranteed_states(round_map, actions)
 
     def get_V(r_idx, t, score, vs_left):
         return V.get((r_idx, t, score, vs_left), 0.0)
@@ -49,7 +117,40 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
                     best = 0
 
-                    for action in action_list:
+                    rule = rules[t]
+                    win_low, win_high = rule["win"]
+
+                    if G[(r_idx, t, score, vs_left)] == 1:
+                        action_list_eval = []
+                        for action in action_list:
+                            if action == "very_small" and vs_left == 0:
+                                continue
+                            if action == "convince":
+                                continue
+                            increments = actions[action]
+                            vs_next = vs_left - 1 if action == "very_small" else vs_left
+                            all_good = True
+                            for inc in increments:
+                                new_score = score + inc
+                                if action == "very_small":
+                                    new_score = min(new_score, win_high)
+                                if new_score > win_high:
+                                    all_good = False
+                                    break
+                                elif win_low <= new_score <= win_high:
+                                    continue
+                                else:
+                                    if G[(r_idx, t, new_score, vs_next)] == 0:
+                                        all_good = False
+                                        break
+                            if all_good:
+                                action_list_eval.append(action)
+                        if not action_list_eval:
+                            action_list_eval = action_list
+                    else:
+                        action_list_eval = action_list
+
+                    for action in action_list_eval:
 
                         if action == "very_small" and vs_left == 0:
                             continue
@@ -70,7 +171,7 @@ def solve_game(round_map, actions, action_probs, p_convince):
                                     else:
                                         success_val = get_V(r_idx + 1, 0, 0, 3)
 
-                                failure_val = get_V(r_idx, 0, 0, 3)
+                                failure_val = 0.0
 
                                 p_success = (score - conv_low + 1) / (conv_high - conv_low + 1)
                                 p_success = max(0, min(1, p_success))
@@ -100,7 +201,7 @@ def solve_game(round_map, actions, action_probs, p_convince):
                                 new_score = min(new_score, win_high)
 
                             if new_score > win_high:
-                                val = get_V(r_idx, 0, 0, 3)
+                                val = 0.0
 
                             elif win_low <= new_score <= win_high:
                                 if t < n_trials - 1:
@@ -128,6 +229,25 @@ def solve_game(round_map, actions, action_probs, p_convince):
         win_low, win_high = rule["win"]
         conv_range = rule["conv"]
 
+        if G[(r_idx, t, score, vs_left)] == 1:
+            if action == "convince":
+                return 0
+            if action == "very_small" and vs_left == 0:
+                return 0
+            increments = actions[action]
+            vs_next = vs_left - 1 if action == "very_small" else vs_left
+            for inc in increments:
+                new_score = score + inc
+                if action == "very_small":
+                    new_score = min(new_score, win_high)
+                if new_score > win_high:
+                    return 0
+                elif win_low <= new_score <= win_high:
+                    continue
+                else:
+                    if G[(r_idx, t, new_score, vs_next)] == 0:
+                        return 0
+
         if action == "convince":
             if conv_range and conv_range[0] <= score <= conv_range[1]:
                 conv_low, conv_high = conv_range
@@ -140,7 +260,7 @@ def solve_game(round_map, actions, action_probs, p_convince):
                     else:
                         success_val = V[(r_idx + 1, 0, 0, 3)]
 
-                failure_val = V[(r_idx, 0, 0, 3)]
+                failure_val = 0.0
 
                 p_success = (score - conv_low + 1) / (conv_high - conv_low + 1)
                 p_success = max(0, min(1, p_success))
@@ -166,7 +286,7 @@ def solve_game(round_map, actions, action_probs, p_convince):
                 new_score = min(new_score, win_high)
 
             if new_score > win_high:
-                val = V[(r_idx, 0, 0, 3)]
+                val = 0.0
 
             elif win_low <= new_score <= win_high:
                 if t < len(rules) - 1:
