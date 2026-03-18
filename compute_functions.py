@@ -28,6 +28,8 @@ def solve_game(round_map, actions, action_probs, p_convince):
     def get_V(r_idx, t, score, vs_left):
         return V.get((r_idx, t, score, vs_left), 0.0)
 
+    action_list = list(actions.keys()) + ["convince"]
+
     for r_idx in reversed(range(n_rounds)):
 
         rules = round_map[rounds[r_idx]]
@@ -47,7 +49,7 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
                     best = 0
 
-                    for action in actions:
+                    for action in action_list:
 
                         if action == "very_small" and vs_left == 0:
                             continue
@@ -58,6 +60,8 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
                         if action == "convince":
                             if conv_range and conv_range[0] <= score <= conv_range[1]:
+                                conv_low, conv_high = conv_range
+
                                 if t < n_trials - 1:
                                     success_val = get_V(r_idx, t + 1, 0, vs_left)
                                 else:
@@ -65,13 +69,19 @@ def solve_game(round_map, actions, action_probs, p_convince):
                                         success_val = 1.0
                                     else:
                                         success_val = get_V(r_idx + 1, 0, 0, 3)
+
                                 failure_val = get_V(r_idx, 0, 0, 3)
+
+                                p_success = (score - conv_low + 1) / (conv_high - conv_low + 1)
+                                p_success = max(0, min(1, p_success))
+
                                 val = (
-                                    p_convince * success_val
-                                    + (1 - p_convince) * failure_val
+                                    p_success * success_val
+                                    + (1 - p_success) * failure_val
                                 )
                             else:
                                 val = 0
+
                             best = max(best, val)
                             continue
 
@@ -86,8 +96,11 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
                             new_score = score + inc
 
-                            if new_score >= 101:
-                                val = 0
+                            if action == "very_small":
+                                new_score = min(new_score, win_high)
+
+                            if new_score > win_high:
+                                val = get_V(r_idx, 0, 0, 3)
 
                             elif win_low <= new_score <= win_high:
                                 if t < n_trials - 1:
@@ -117,6 +130,8 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
         if action == "convince":
             if conv_range and conv_range[0] <= score <= conv_range[1]:
+                conv_low, conv_high = conv_range
+
                 if t < len(rules) - 1:
                     success_val = V[(r_idx, t + 1, 0, vs_left)]
                 else:
@@ -124,10 +139,15 @@ def solve_game(round_map, actions, action_probs, p_convince):
                         success_val = 1.0
                     else:
                         success_val = V[(r_idx + 1, 0, 0, 3)]
+
                 failure_val = V[(r_idx, 0, 0, 3)]
+
+                p_success = (score - conv_low + 1) / (conv_high - conv_low + 1)
+                p_success = max(0, min(1, p_success))
+
                 return (
-                    p_convince * success_val
-                    + (1 - p_convince) * failure_val
+                    p_success * success_val
+                    + (1 - p_success) * failure_val
                 )
             return 0
 
@@ -142,8 +162,11 @@ def solve_game(round_map, actions, action_probs, p_convince):
 
             new_score = score + inc
 
-            if new_score >= 101:
-                val = 0
+            if action == "very_small":
+                new_score = min(new_score, win_high)
+
+            if new_score > win_high:
+                val = V[(r_idx, 0, 0, 3)]
 
             elif win_low <= new_score <= win_high:
                 if t < len(rules) - 1:
@@ -176,6 +199,7 @@ def compute_policy(round_map, actions, action_probs, p_convince):
     rows = []
 
     rounds = sorted(round_map.keys())
+    action_list = list(actions.keys()) + ["convince"]
 
     for r_idx, r in enumerate(rounds):
 
@@ -186,7 +210,7 @@ def compute_policy(round_map, actions, action_probs, p_convince):
             for score in range(0, 101):
                 for vs_left in range(4):
 
-                    for action in actions:
+                    for action in action_list:
 
                         if action == "very_small" and vs_left == 0:
                             continue
