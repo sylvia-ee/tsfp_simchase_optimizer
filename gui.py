@@ -6,20 +6,16 @@ import numpy as np
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.lines import Line2D
 
-
 # config
 
 BASE_PATH = "data"
 st.title("Influencer Island Decision Helper")
 
-# action display mapping
 action_label_map = {
     "very_small": "chocolate [2-9]",
     "small": "small [1-20]",
     "large": "large [20-45]"
 }
-
-# select precomputed data 
 
 dataset_options = [
     d for d in os.listdir(BASE_PATH)
@@ -29,8 +25,6 @@ dataset_options = [
 dataset = st.selectbox("Dataset", dataset_options)
 dataset_path = os.path.join(BASE_PATH, dataset)
 
-# load tables
-
 optimal_Q = pd.read_csv(
     os.path.join(dataset_path, "tables", "optimal_Q_table.csv")
 )
@@ -38,8 +32,6 @@ optimal_Q = pd.read_csv(
 full_Q = pd.read_csv(
     os.path.join(dataset_path, "tables", "full_Q_table.csv")
 )
-
-# input
 
 stages = sorted(optimal_Q["round"].unique())
 stage = st.selectbox("Stage", stages)
@@ -56,8 +48,6 @@ vs_left = st.selectbox(
     vs_vals,
     index=vs_vals.index(default_vs)
 )
-
-# score input
 
 score_input = st.number_input("Score", step=1)
 
@@ -76,8 +66,6 @@ if score_input not in valid_scores:
     st.stop()
 
 score = int(score_input)
-
-# lookup
 
 mask = (
     (optimal_Q["round"] == stage) &
@@ -105,29 +93,27 @@ best_action = opt_row["action"]
 best_prob = opt_row["win_probability"]
 
 df["regret"] = best_prob - df["win_probability"]
-
-# add display labels
 df["action_display"] = df["action"].map(action_label_map)
 
-# output
-
 st.subheader("Recommendation")
-
 st.success(f"Best action: {action_label_map.get(best_action, best_action)}")
 st.write(f"Win probability: {best_prob:.4f}")
 
 st.subheader("Action Comparison")
-
 st.bar_chart(df.set_index("action_display")["win_probability"])
 
-# display table with labels
 df_display = df.copy()
 df_display["action"] = df_display["action_display"]
 st.dataframe(df_display.drop(columns=["action_display"]))
 
-# heatmap
 
 def plot_policy_heatmap_specific_state(optimal_Q, highlight_state=None):
+
+    TITLE_SIZE = 34
+    LABEL_SIZE = 28
+    TICK_SIZE = 22
+    LEGEND_SIZE = 22
+    CBAR_SIZE = 22
 
     figs = {}
 
@@ -160,22 +146,18 @@ def plot_policy_heatmap_specific_state(optimal_Q, highlight_state=None):
         Z = pivot.values
 
         fig, ax = plt.subplots(
-            figsize=(max(15, Z.shape[1]*0.35),
-                     max(10, Z.shape[0]*0.12))
+            figsize=(max(20, Z.shape[1]*0.45),
+                     max(14, Z.shape[0]*0.16))
         )
 
-        colorblind_palette = [
+        cmap = ListedColormap([
             "#0072B2",
             "#E69F00",
             "#009E73",
             "#D55E00",
-            "#CC79A7",
-            "#F0E442",
-            "#56B4E9",
-            "#000000"
-        ]
+            "#CC79A7"
+        ][:len(actions)])
 
-        cmap = ListedColormap(colorblind_palette[:len(actions)])
         norm = BoundaryNorm(np.arange(len(actions)+1)-0.5, cmap.N)
 
         mesh = ax.pcolormesh(
@@ -189,30 +171,35 @@ def plot_policy_heatmap_specific_state(optimal_Q, highlight_state=None):
             linewidth=0.3
         )
 
-        ax.set_title(f"Optimal Decision (Stage {r})", pad=40, fontsize=30)
-        ax.set_ylabel("Score", fontsize=30)
-        ax.set_xlabel("Chocolate Left (nested within round)", fontsize=30)
+        ax.set_title(f"Optimal Decision (Stage {r})", fontsize=TITLE_SIZE, pad=60)
+        ax.set_ylabel("Score", fontsize=LABEL_SIZE, labelpad=15)
+        ax.set_xlabel("Chocolate Left (nested within round)", fontsize=LABEL_SIZE, labelpad=15)
 
         x_centers = np.arange(Z.shape[1]) + 0.5
         vs_labels = [vs for (_, vs) in col_order]
         ax.set_xticks(x_centers)
-        ax.set_xticklabels(vs_labels)
+        ax.set_xticklabels(vs_labels, fontsize=TICK_SIZE)
 
         y_centers = np.arange(Z.shape[0]) + 0.5
         ax.set_yticks(y_centers[::10])
-        ax.set_yticklabels(scores[::10])
+        ax.set_yticklabels(scores[::10], fontsize=TICK_SIZE)
+
+        ax.tick_params(axis='both', labelsize=TICK_SIZE, pad=10)
 
         n_vs = len(vs_vals)
 
         for i, t in enumerate(rounds):
             start = i * n_vs
-            ax.axvline(start, color="black", linewidth=1.5)
+            ax.axvline(start, linewidth=10, color="white", zorder=5)
 
             center = start + n_vs / 2
-            ax.text(center, Z.shape[0] + 1.5, f"R{t}",
-                    ha="center", va="bottom", fontsize=30)
+            ax.text(center, Z.shape[0] + 2,
+                    f"R{t}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=24)
 
-        ax.axvline(Z.shape[1], color="black", linewidth=1.5)
+        ax.axvline(Z.shape[1], linewidth=1.5)
 
         for i, t in enumerate(rounds):
 
@@ -223,14 +210,14 @@ def plot_policy_heatmap_specific_state(optimal_Q, highlight_state=None):
 
             start = i * n_vs
             end = start + n_vs
-
+                
             if pd.notna(win_low):
                 ax.plot([start, end], [win_low, win_low],
-                        linestyle="--", color="black", linewidth=1.5)
+                        linestyle="--", color="black", linewidth=2)
 
             if pd.notna(conv_low):
                 ax.plot([start, end], [conv_low, conv_low],
-                        linestyle=":", color="black", linewidth=2)
+                        linestyle=":", color="black", linewidth=2.5)
 
         if highlight_state is not None:
             r_h, t_h, s_h, vs_h = highlight_state
@@ -243,32 +230,32 @@ def plot_policy_heatmap_specific_state(optimal_Q, highlight_state=None):
                     )
                     row_idx = scores.index(s_h)
 
-                    ax.add_patch(plt.Rectangle((col_idx, row_idx), 1, 1,
-                                            fill=False, edgecolor="black", linewidth=4))
-                    ax.add_patch(plt.Rectangle((col_idx, row_idx), 1, 1,
-                                            fill=False, edgecolor="white", linewidth=2))
-
+                    ax.add_patch(plt.Rectangle(
+                        (col_idx, row_idx), 1, 1,
+                        fill=False, linewidth=4
+                    ))
                 except ValueError:
                     pass
 
-        cbar = plt.colorbar(mesh, ax=ax, pad=0.02)
+        cbar = plt.colorbar(mesh, ax=ax, pad=0.03, fraction=0.05)
         cbar.set_ticks(range(len(actions)))
         cbar.set_ticklabels(action_labels)
-        cbar.set_label("Action")
+        cbar.ax.tick_params(labelsize=CBAR_SIZE)
 
         legend_elements = [
-            Line2D([0], [0], color='black', linestyle='--', label='Win Threshold'),
-            Line2D([0], [0], color='black', linestyle=':', label='Convince Threshold')
+            Line2D([0], [0], linestyle='--', label='Win Threshold'),
+            Line2D([0], [0], linestyle=':', label='Convince Threshold')
         ]
 
         ax.legend(
             handles=legend_elements,
-            bbox_to_anchor=(1.18, 1),
+            bbox_to_anchor=(1.15, 1),
             loc="upper left",
-            frameon=False
+            frameon=False,
+            fontsize=LEGEND_SIZE
         )
 
-        plt.subplots_adjust(right=0.78, top=0.85)
+        plt.subplots_adjust(right=0.75, top=0.88)
 
         figs[r] = fig
 
