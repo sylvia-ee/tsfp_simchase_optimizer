@@ -7,5 +7,5 @@ if __name__ == "__main__":
     if get_script_run_ctx() is None:
         from streamlit.web.cli import main
         import sys
-        sys.argv = ['streamlit', 'run', 'gui.py']
+        sys.argv = ['streamlit', 'run', 'gui.py', '--server.address=0.0.0.0']
         main()
